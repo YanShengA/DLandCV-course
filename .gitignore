@@ -1,0 +1,7 @@
+homework1/DL/mmclassification/logs
+homework1/DL/mmclassification/work_dirs
+*.pth
+*.log
+__pycache__/
+.idea/
+.vscode/

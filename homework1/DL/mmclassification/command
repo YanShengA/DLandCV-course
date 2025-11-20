@@ -1,0 +1,61 @@
+PORT=29505 CUDA_VISIBLE_DEVICES=4,5 nohup ./tools/dist_train.sh \
+/media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet18.py 2 \
+--work-dir work_dirs/resnet18 \
+> logs/resnet18.log 2>&1 &
+
+
+
+pushtask_mm() {
+    # 1. 获取配置文件路径
+    local config_path=$1
+    
+    # 检查是否提供了参数
+    if [ -z "$config_path" ]; then
+        echo "错误: 请提供配置文件路径"
+        echo "用法: pushtask_mm <config_path>"
+        return 1
+    fi
+
+    # 2. 提取任务名称 (例如从 .../resnet18.py 提取出 resnet18)
+    local task_name=$(basename "$config_path" .py)
+    
+    # 3. 生成随机端口 (防止并行任务冲突)
+    local port=$((29500 + RANDOM % 200))
+    
+    # 4. 自动生成时间戳 (用于日志区分)
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+
+    # 确保日志和工作目录存在
+    mkdir -p logs
+    mkdir -p work_dirs/${task_name}
+
+    # 5. 构造指令
+    # 注意：
+    # - 移除了 CUDA_VISIBLE_DEVICES (调度器负责)
+    # - 移除了 nohup 和 & (调度器负责)
+    # - 保留了 '2' (显卡数量)，这必须与调度器脚本里的 GPUS_PER_TASK=2 一致
+    # - 自动设置 --work-dir
+    # - 自动重定向日志
+    local cmd="PORT=$port ./tools/dist_train.sh \
+    $config_path 2 \
+    --work-dir work_dirs/${task_name} \
+    > logs/${task_name}.log 2>&1"
+
+    # 6. 写入任务队列文件
+    # 文件名格式：时间戳_任务名.sh
+    local queue_file="./task_queue/$(date +%s)_${task_name}.sh"
+    
+    echo "$cmd" > "$queue_file"
+    
+    echo "✅ 任务已加入队列: ${task_name}"
+    echo "   📄 日志路径: logs/${task_name}.log"
+    echo "   📂 Work Dir: work_dirs/${task_name}"
+    echo "   🔌 使用端口: $port"
+}
+
+
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet34.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet50.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet101.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet152.py
+
