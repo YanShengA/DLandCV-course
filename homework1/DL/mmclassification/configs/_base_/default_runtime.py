@@ -34,9 +34,15 @@ env_cfg = dict(
     dist_cfg=dict(backend='nccl'),
 )
 
-# set visualizer
-vis_backends = [dict(type='LocalVisBackend')]
-visualizer = dict(type='UniversalVisualizer', vis_backends=vis_backends)
+# 只需要修改 vis_backends 变量即可
+vis_backends = [
+    dict(type='LocalVisBackend'),
+    dict(type='TensorboardVisBackend')  # <-- 在这里新增
+]
+
+# visualizer 的定义保持不变，因为它引用了上面的变量
+visualizer = dict(type='UniversalVisualizer', vis_backends=vis_backends, name='visualizer')
+
 
 # set log level
 log_level = 'INFO'
