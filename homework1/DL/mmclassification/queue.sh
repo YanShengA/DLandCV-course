@@ -15,7 +15,7 @@ GPUS_PER_TASK=2
 # 【关键】最大允许同时占用的显卡总数 (配额机制)
 # 例如：服务器8张卡，限制只用6张。
 # 脚本会计算：(正在运行的任务数 * 单任务显卡数) + 新任务显卡数 <= MAX_TOTAL_GPUS
-MAX_TOTAL_GPUS=6
+MAX_TOTAL_GPUS=8
 
 # 3. 阈值设置
 # 显存低于此值(MiB)视为闲置
@@ -23,7 +23,7 @@ IDLE_MEM_THRESHOLD=6000
 
 # 启动任务后的预热等待时间(秒)
 # 必须足够长，让 Python 进程加载并占用显存，防止下一轮检测误判
-WARMUP_DELAY=120
+WARMUP_DELAY=30
 
 # 轮询间隔(秒)
 POLL_INTERVAL=10

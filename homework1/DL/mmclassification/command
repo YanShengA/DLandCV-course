@@ -1,7 +1,7 @@
 PORT=29505 CUDA_VISIBLE_DEVICES=4,5 nohup ./tools/dist_train.sh \
-/media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet18.py 2 \
---work-dir work_dirs/resnet18 \
-> logs/resnet18.log 2>&1 &
+/media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_1.py 2 \
+--work-dir work_dirs/F_1 \
+> logs/F_1.log 2>&1 &
 
 
 
@@ -23,7 +23,7 @@ pushtask_mm() {
     local port=$((29500 + RANDOM % 200))
     
     # 4. 自动生成时间戳 (用于日志区分)
-    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local timestamp=$(date +%Y%m%E_%H%M%S)
 
     # 确保日志和工作目录存在
     mkdir -p logs
@@ -54,8 +54,22 @@ pushtask_mm() {
 }
 
 
-pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet34.py
-pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet50.py
-pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet101.py
-pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/resnet152.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_1.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_2.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_3.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_4.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_5.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_6.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_7.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_8.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_9.py
+pushtask_mm /media/HDD0/wzl/mmcls/DLandCV-course/homework1/DL/mmclassification/configs/Amytest/F_10.py
 
+
+
+tensorboard --logdir=./work_dirs --port=6007
+
+本地电脑
+ssh -L 16007:localhost:6007 fuping@10.21.12.40
+Ek&JkfG@roQfC
+然后打开http://localhost:16007
