@@ -10,6 +10,7 @@ class TrainOptions(BaseOptions):
     def initialize(self, parser):
         parser = BaseOptions.initialize(self, parser)
         # HTML visualization parameters
+        parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         parser.add_argument('--display_freq', type=int, default=400, help='frequency of showing training results on screen')
         parser.add_argument('--update_html_freq', type=int, default=1000, help='frequency of saving training results to html')
         parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
@@ -30,6 +31,11 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--pool_size', type=int, default=50, help='the size of image buffer that stores previously generated images')
         parser.add_argument('--lr_policy', type=str, default='linear', help='learning rate policy. [linear | step | plateau | cosine]')
         parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
-
+        parser.add_argument('--use_vgg', action='store_true', help='use VGG perceptual loss')
+        parser.add_argument('--use_fm', action='store_true', help='use feature matching loss')
+        parser.add_argument('--use_ssim', action='store_true', help='use SSIM loss')
+        parser.add_argument('--vgg_weight', type=float, default=10.0, help='weight for VGG loss')
+        parser.add_argument('--fm_weight', type=float, default=10.0, help='weight for feature matching loss')
+        parser.add_argument('--lambda_GAN', type=float, default=1.0, help='weight for GAN loss')
         self.isTrain = True
         return parser

@@ -1,0 +1,15 @@
+dominate>=2.4.0
+visdom>=0.1.8.9
+wandb
+pillow>=9.0.0
+numpy>=1.21.0
+scipy>=1.7.0
+requests>=2.27.0
+tqdm
+scikit-image
+matplotlib
+
+
+ssh -L 8097:localhost:8097 fuping@10.21.12.40
+Ek&JkfG@roQfC
+http://localhost:8097

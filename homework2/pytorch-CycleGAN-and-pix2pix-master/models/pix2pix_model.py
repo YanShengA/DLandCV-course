@@ -1,7 +1,7 @@
 import torch
 from .base_model import BaseModel
 from . import networks
-
+import torchvision.models as models
 
 class Pix2PixModel(BaseModel):
     """This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
@@ -46,6 +46,10 @@ class Pix2PixModel(BaseModel):
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         self.loss_names = ["G_GAN", "G_L1", "D_real", "D_fake"]
+        if hasattr(opt, 'use_vgg') and opt.use_vgg:
+            self.loss_names.append("G_VGG")
+        if hasattr(opt, 'use_fm') and opt.use_fm:
+            self.loss_names.append("G_FM")
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         self.visual_names = ["real_A", "fake_B", "real_B"]
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
@@ -103,14 +107,73 @@ class Pix2PixModel(BaseModel):
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
-        # First, G(A) should fake the discriminator
+        # 1. 生成 Discriminator 需要的输入 (Conditional GAN 需要拼接 A 和 B)
         fake_AB = torch.cat((self.real_A, self.fake_B), 1)
         pred_fake = self.netD(fake_AB)
-        self.loss_G_GAN = self.criterionGAN(pred_fake, True)
-        # Second, G(A) = B
+
+        # 2. 计算基础 GAN Loss (G 骗 D)
+        self.loss_G_GAN = self.criterionGAN(pred_fake, True) * self.opt.lambda_GAN
+
+        # 3. 计算 L1 Loss (像素级对齐)
         self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
-        # combine loss and calculate gradients
+
+        # 初始化总 Loss
         self.loss_G = self.loss_G_GAN + self.loss_G_L1
+
+        # ============================================================
+        # 4. [Exp D/E] VGG Perceptual Loss (感知损失)
+        # ============================================================
+        # 检查是否启用了 use_vgg 参数
+        if hasattr(self.opt, 'use_vgg') and self.opt.use_vgg:
+            # 懒加载 VGG，只在第一次用到时加载，节省显存
+            if not hasattr(self, 'vgg'):
+                # 加载 VGG19 预训练模型，取前 18 层 (relu3_x 附近)
+                self.vgg = models.vgg19(pretrained=True).features[:18].to(self.device).eval()
+                # 冻结参数，绝对不要更新 VGG
+                for p in self.vgg.parameters():
+                    p.requires_grad = False
+                self.criterionVGG = torch.nn.L1Loss()
+            
+            # 计算 VGG 特征距离
+            vgg_fake = self.vgg(self.fake_B)
+            vgg_real = self.vgg(self.real_B)
+            
+            # 获取权重，默认为 10.0
+            w_vgg = getattr(self.opt, 'vgg_weight', 10.0)
+            self.loss_G_VGG = self.criterionVGG(vgg_fake, vgg_real) * w_vgg
+            
+            # 加到总 Loss
+            self.loss_G += self.loss_G_VGG
+
+        # ============================================================
+        # 5. [Exp C/E] Feature Matching Loss (特征匹配损失)
+        # ============================================================
+        # 检查是否启用了 use_fm 参数
+        if hasattr(self.opt, 'use_fm') and self.opt.use_fm:
+            # FM Loss 需要比较 D 对“真图”和“假图”的中间层反应
+            # 我们需要计算 pred_real (注意：必须 detach，不更新 D)
+            real_AB = torch.cat((self.real_A, self.real_B), 1)
+            pred_real = self.netD(real_AB)
+            
+            w_fm = getattr(self.opt, 'fm_weight', 10.0)
+            
+            # 兼容性处理：Discriminator 可能返回列表 (Multiscale) 或 Tensor
+            loss_fm = 0
+            if isinstance(pred_fake, list):
+                # 如果是多尺度 D，把每一层的差异加起来
+                for i in range(len(pred_fake)):
+                    # .detach() 很重要！我们不希望 G 的梯度传导去改变 D 的权重
+                    loss_fm += torch.mean(torch.abs(pred_fake[i] - pred_real[i].detach()))
+            else:
+                loss_fm = torch.mean(torch.abs(pred_fake - pred_real.detach()))
+            
+            self.loss_G_FM = loss_fm * w_fm
+            
+            # 加到总 Loss
+            self.loss_G += self.loss_G_FM
+
+        # ============================================================
+        
         self.loss_G.backward()
 
     def optimize_parameters(self):
