@@ -5,3 +5,5 @@ homework1/DL/mmclassification/work_dirs
 __pycache__/
 .idea/
 .vscode/
+homework2/crontrolnet/checkpoints/
+homework2/pytorch-CycleGAN-and-pix2pix-master/checkpoints/
