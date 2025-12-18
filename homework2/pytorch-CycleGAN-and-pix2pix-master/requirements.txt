@@ -8,8 +8,3 @@ requests>=2.27.0
 tqdm
 scikit-image
 matplotlib
-
-
-ssh -L 8097:localhost:8097 fuping@10.21.12.40
-Ek&JkfG@roQfC
-http://localhost:8097

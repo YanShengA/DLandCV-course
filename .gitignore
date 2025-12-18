@@ -7,3 +7,9 @@ __pycache__/
 .vscode/
 homework2/crontrolnet/checkpoints/
 homework2/pytorch-CycleGAN-and-pix2pix-master/checkpoints/
+homework2/taming-transformers/data
+homework2/taming-transformers/assets
+homework2/taming-transformers/logs
+homework2/BicycleGAN/checkpoints
+homework2/BicycleGAN/datasets
+homework2/BicycleGAN/imgs

@@ -24,6 +24,7 @@ class BaseOptions:
         parser.add_argument("--name", type=str, default="experiment_name", help="name of the experiment. It decides where to store samples and models")
         parser.add_argument("--checkpoints_dir", type=str, default="./checkpoints", help="models are saved here")
         # model parameters
+        parser.add_argument('--use_edge_map', action='store_true', help='if specified, use canny edge map as an extra input channel')
         parser.add_argument("--model", type=str, default="cycle_gan", help="chooses which model to use. [cycle_gan | pix2pix | test | colorization]")
         parser.add_argument("--input_nc", type=int, default=3, help="# of input image channels: 3 for RGB and 1 for grayscale")
         parser.add_argument("--output_nc", type=int, default=3, help="# of output image channels: 3 for RGB and 1 for grayscale")
@@ -116,6 +117,8 @@ class BaseOptions:
         """Parse our options, create checkpoints directory suffix, and set up gpu device."""
         opt = self.gather_options()
         opt.isTrain = self.isTrain  # train or test
+        if opt.use_edge_map:
+            opt.input_nc += 1
 
         # process opt.suffix
         if opt.suffix:

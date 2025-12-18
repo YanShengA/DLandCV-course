@@ -37,5 +37,11 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--vgg_weight', type=float, default=10.0, help='weight for VGG loss')
         parser.add_argument('--fm_weight', type=float, default=10.0, help='weight for feature matching loss')
         parser.add_argument('--lambda_GAN', type=float, default=1.0, help='weight for GAN loss')
+        parser.add_argument('--use_resize_conv', action='store_true', help='use Resize-Conv instead of Transposed Conv to reduce artifacts')
+        parser.add_argument('--use_spectral_norm', action='store_true', help='use spectral norm in discriminator')
+        parser.add_argument('--use_dilated_conv', action='store_true', help='use dilated convolution in encoder to increase receptive field')
+        parser.add_argument('--use_large_kernel', action='store_true', help='use 8x8 large kernel conv in generator')
+        parser.add_argument('--use_attention', action='store_true', help='use self-attention layer in generator bottleneck')
+        
         self.isTrain = True
         return parser

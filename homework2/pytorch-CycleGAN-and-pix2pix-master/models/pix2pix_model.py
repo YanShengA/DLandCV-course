@@ -2,6 +2,60 @@ import torch
 from .base_model import BaseModel
 from . import networks
 import torchvision.models as models
+from math import exp
+import torch.nn.functional as F
+# === SSIM Helper Classes Start ===
+def gaussian(window_size, sigma):
+    gauss = torch.tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
+    return gauss/gauss.sum()
+
+def create_window(window_size, channel):
+    _1D_window = gaussian(window_size, 1.5).unsqueeze(1)
+    _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
+    window = _2D_window.expand(channel, 1, window_size, window_size).contiguous()
+    return window
+
+class SSIMLoss(torch.nn.Module):
+    def __init__(self, window_size=11, size_average=True):
+        super(SSIMLoss, self).__init__()
+        self.window_size = window_size
+        self.size_average = size_average
+        self.channel = 1
+        self.window = create_window(window_size, self.channel)
+
+    def forward(self, img1, img2):
+        (_, channel, _, _) = img1.size()
+        if channel == self.channel and self.window.data.type() == img1.data.type():
+            window = self.window
+        else:
+            window = create_window(self.window_size, channel)
+            if img1.is_cuda:
+                window = window.cuda(img1.get_device())
+            window = window.type_as(img1)
+            self.window = window
+            self.channel = channel
+
+        mu1 = F.conv2d(img1, window, padding=self.window_size//2, groups=channel)
+        mu2 = F.conv2d(img2, window, padding=self.window_size//2, groups=channel)
+
+        mu1_sq = mu1.pow(2)
+        mu2_sq = mu2.pow(2)
+        mu1_mu2 = mu1*mu2
+
+        sigma1_sq = F.conv2d(img1*img1, window, padding=self.window_size//2, groups=channel) - mu1_sq
+        sigma2_sq = F.conv2d(img2*img2, window, padding=self.window_size//2, groups=channel) - mu2_sq
+        sigma12 = F.conv2d(img1*img2, window, padding=self.window_size//2, groups=channel) - mu1_mu2
+
+        C1 = 0.01**2
+        C2 = 0.03**2
+
+        ssim_map = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))
+
+        if self.size_average:
+            return 1 - ssim_map.mean() # 返回 1 - SSIM 作为 Loss
+        else:
+            return 1 - ssim_map.mean(1).mean(1).mean(1)
+# === SSIM Helper Classes End ===
 
 class Pix2PixModel(BaseModel):
     """This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
@@ -50,6 +104,8 @@ class Pix2PixModel(BaseModel):
             self.loss_names.append("G_VGG")
         if hasattr(opt, 'use_fm') and opt.use_fm:
             self.loss_names.append("G_FM")
+        if opt.use_ssim:
+            self.loss_names.append('G_SSIM') # 如果开启，增加 G_SSIM 显示
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         self.visual_names = ["real_A", "fake_B", "real_B"]
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
@@ -59,15 +115,17 @@ class Pix2PixModel(BaseModel):
             self.model_names = ["G"]
         self.device = opt.device
         # define networks (both generator and discriminator)
-        self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm, not opt.no_dropout, opt.init_type, opt.init_gain)
+        self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm, not opt.no_dropout, opt.init_type, opt.init_gain, opt.use_resize_conv, opt.use_dilated_conv, opt.use_large_kernel, opt.use_attention)
 
         if self.isTrain:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
-            self.netD = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD, opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain)
+            self.netD = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD, opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, opt.use_spectral_norm)
 
         if self.isTrain:
             # define loss functions
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)  # move to the device for custom loss
             self.criterionL1 = torch.nn.L1Loss()
+            if opt.use_ssim:
+                self.criterionSSIM = SSIMLoss().to(self.device)
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -117,8 +175,14 @@ class Pix2PixModel(BaseModel):
         # 3. 计算 L1 Loss (像素级对齐)
         self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
 
-        # 初始化总 Loss
-        self.loss_G = self.loss_G_GAN + self.loss_G_L1
+        self.loss_G_SSIM = 0
+        if self.opt.use_ssim:
+            # 权重建议设为 10 (因为 L1 通常是 100，SSIM 值较小，稍微放大一点权值)
+            # 或者按照常用配置：L1 * 0.8 + SSIM * 0.2 (这里我们简单叠加)
+            self.loss_G_SSIM = self.criterionSSIM(self.fake_B, self.real_B) * 10 
+        
+        # 总 Loss
+        self.loss_G = self.loss_G_GAN + self.loss_G_L1 + self.loss_G_SSIM
 
         # ============================================================
         # 4. [Exp D/E] VGG Perceptual Loss (感知损失)
